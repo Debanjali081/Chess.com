@@ -24,52 +24,54 @@ app.get('/', (req, res) => {
 })
 
 io.on("connection", ((uniqueSocket) => {
-    console.log("Connected");
+    if (!players.white) {
+        players.white = uniqueSocket.id;
+        uniqueSocket.emit("playerRole", "W");
+    }
+    else if (!players.black) {
+        players.black = uniqueSocket.id;
+        uniqueSocket.emit("playerRole", "B");
+    }
+    else {
+        uniqueSocket.emit("spectatorRole")
+    }
+    uniqueSocket.on("disconnect", () => {
+        if (uniqueSocket.id === players.white) {
+            delete players.white;
+        }
+        else if (uniqueSocket.id === players.black) {
+            delete players.black;
+        }
+    })
+
+    uniqueSocket.on("move", (move) => {
+        try {
+            if (chess.turn() === 'w' && uniqueSocket.id !== players.white) return;
+            if (chess.turn() === 'b' && uniqueSocket.id !== players.black) return;
+    
+            const result = chess.move(move);
+            if (result) {
+                currentPlayer = chess.turn();
+                io.emit("move", move);
+                io.emit("boardState", chess.fen());
+            }
+            else {
+                console.log("Invalid Move : ", move);
+                uniqueSocket.emit("invalidMove", move)
+            }
+    
+        } catch (error) {
+            console.log(error.message);
+            uniqueSocket.emit("Invalid Move : ", move)
+        }
+    });
 }))
 
-if (!players.white) {
-    players.white = uniqueSocket.id;
-    uniqueSocket.emit("playerRole", "W");
-}
-else if (!players.black) {
-    players.black = uniqueSocket.id;
-    uniqueSocket.emit("playerRole", "B");
-}
-else {
-    uniqueSocket.emit("spectatorRole")
-}
 
 
-uniqueSocket.on("disconnect", () => {
-    if (uniqueSocket.id === players.white) {
-        delete players.white;
-    }
-    else if (uniqueSocket.id === players.black) {
-        delete players.black;
-    }
-})
 
-uniqueSocket.on("move", (move) => {
-    try {
-        if (chess.turn() === 'w' && uniqueSocket.id !== players.white) return;
-        if (chess.turn() === 'b' && uniqueSocket.id !== players.black) return;
 
-        const result = chess.move(move);
-        if (result) {
-            currentPlayer = chess.turn();
-            io.emit("move", move);
-            io.emit("boardState", chess.fen());
-        }
-        else {
-            console.log("Invalid Move : ", move);
-            uniqueSocket.emit("invalidMove", move)
-        }
 
-    } catch (error) {
-        console.log(error.message);
-        uniqueSocket.emit("Invalid Move : ", move)
-    }
-});
 
 
 server.listen(3000, () => {
